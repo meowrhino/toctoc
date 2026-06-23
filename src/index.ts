@@ -62,6 +62,8 @@ export default {
       const { name } = (await request.json()) as { name?: string };
       const clean = String(name || "").trim().slice(0, 25);
       if (!clean) return json({ error: "name required" }, { status: 400 });
+      // "~" es el separador del id de conversación (a~b); reservado en nombres.
+      if (clean.includes("~")) return json({ error: "el nombre no puede contener ~" }, { status: 400 });
       const cookie = await setUserCookie(clean, env.AUTH_SECRET);
       return json({ name: clean }, { headers: { "Set-Cookie": cookie } });
     }
@@ -94,6 +96,7 @@ export default {
       const { with: target } = (await request.json()) as { with?: string };
       const other = String(target || "").trim().slice(0, 25);
       if (!other || other === user) return json({ error: "bad target" }, { status: 400 });
+      if (other.includes("~")) return json({ error: "nombre inválido" }, { status: 400 });
 
       const conv = conversationIdFor(user, other);
       // Lo registramos en la bandeja de AMBOS, para que los dos lo vean.
