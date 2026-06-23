@@ -6,6 +6,9 @@ export interface Env {
   CHAT: DurableObjectNamespace<ConversationDO>;
   USERS: DurableObjectNamespace<UserDO>;
   ASSETS: Fetcher;
+  // Secret para firmar la cookie de identidad (HMAC). En prod: `wrangler secret
+  // put AUTH_SECRET`; en local: .dev.vars.
+  AUTH_SECRET: string;
 }
 
 export { ConversationDO, UserDO };
@@ -26,7 +29,7 @@ function json(data: unknown, init?: ResponseInit): Response {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const user = getUser(request);
+    const user = await getUser(request, env.AUTH_SECRET);
 
     // --- WebSocket de una conversación ---
     if (url.pathname === "/ws") {
@@ -51,10 +54,12 @@ export default {
 
     // --- Identidad ---
     if (url.pathname === "/api/login" && request.method === "POST") {
+      if (!env.AUTH_SECRET) return json({ error: "server misconfigured" }, { status: 500 });
       const { name } = (await request.json()) as { name?: string };
       const clean = String(name || "").trim().slice(0, 25);
       if (!clean) return json({ error: "name required" }, { status: 400 });
-      return json({ name: clean }, { headers: { "Set-Cookie": setUserCookie(clean) } });
+      const cookie = await setUserCookie(clean, env.AUTH_SECRET);
+      return json({ name: clean }, { headers: { "Set-Cookie": cookie } });
     }
 
     if (url.pathname === "/api/me") {
