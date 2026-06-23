@@ -30,4 +30,12 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ with: other }),
     }).then(jsonOrThrow),
+
+  // Guarda mi color (global a todas mis conversaciones) → { color }
+  setColor: (color) =>
+    fetch("/api/color", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color }),
+    }).then(jsonOrThrow),
 };

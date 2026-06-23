@@ -1,8 +1,11 @@
-// WebSocket de una conversación, con reconexión automática. El nombre NO viaja
-// por la URL: el servidor lo saca de la cookie autenticada. El protocolo (JSON
-// con {type:"history"|"msg"}) lo define el motor compartido (ConversationDO).
+// WebSocket de una conversación, con reconexión automática. El nombre y el color
+// NO viajan por la URL: el servidor los saca de la sesión autenticada (cookie +
+// UserDO). Protocolo: {type:"history"|"msg"|"color"}.
+//   history → { messages, profiles }   (snapshot inicial: mensajes + colores)
+//   msg     → un mensaje
+//   color   → { name, color }          (alguien cambió su color)
 
-export function connectConversation({ conversationId, onHistory, onMessage }) {
+export function connectConversation({ conversationId, onHistory, onMessage, onColor }) {
   let ws;
   let closed = false;
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -12,11 +15,10 @@ export function connectConversation({ conversationId, onHistory, onMessage }) {
     ws = new WebSocket(url);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
-      if (data.type === "history") onHistory(data.messages);
+      if (data.type === "history") onHistory(data.messages, data.profiles || {});
       else if (data.type === "msg") onMessage(data);
+      else if (data.type === "color") onColor(data);
     };
-    // El DO hiberna o la red cae → el socket se cierra; reabrimos solos, salvo
-    // que hayamos cerrado a propósito al cambiar de chat.
     ws.onclose = () => {
       if (!closed) setTimeout(open, 1000);
     };
@@ -29,7 +31,11 @@ export function connectConversation({ conversationId, onHistory, onMessage }) {
         ws.send(JSON.stringify({ type: "msg", body }));
       }
     },
-    // Al abrir otra conversación cerramos ésta y evitamos que reconecte.
+    setColor(color) {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "color", color }));
+      }
+    },
     close() {
       closed = true;
       try {

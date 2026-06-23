@@ -5,8 +5,11 @@
 import { $ } from "./util.js";
 
 let me = null;
+let myColor = null;
 
 export const getMe = () => me;
+export const getMyColor = () => myColor;
+export const setMyColor = (color) => { myColor = color; };
 
 export function setMe(name) {
   me = name;

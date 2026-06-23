@@ -1,6 +1,7 @@
 import { ConversationDO } from "./conversation";
 import { UserDO } from "./userdo";
 import { getUser, setUserCookie } from "./auth";
+import { cleanColor, defaultColor } from "./color";
 
 export interface Env {
   CHAT: DurableObjectNamespace<ConversationDO>;
@@ -45,9 +46,12 @@ export default {
         return new Response("forbidden", { status: 403 });
       }
 
-      // Reenviamos al DO con el nombre AUTENTICADO (ignoramos lo que diga el cliente).
+      // Reenviamos al DO con el nombre AUTENTICADO y el color del usuario (desde
+      // su UserDO), ignorando lo que diga el cliente.
+      const myColor = (await env.USERS.get(env.USERS.idFromName(user)).getColor()) ?? defaultColor(user);
       const target = new URL(request.url);
       target.searchParams.set("name", user);
+      target.searchParams.set("color", myColor);
       const stub = env.CHAT.get(env.CHAT.idFromName(conv));
       return stub.fetch(new Request(target, request));
     }
@@ -63,7 +67,19 @@ export default {
     }
 
     if (url.pathname === "/api/me") {
-      return json({ name: user });
+      if (!user) return json({ name: null });
+      const stored = await env.USERS.get(env.USERS.idFromName(user)).getColor();
+      return json({ name: user, color: stored ?? defaultColor(user) });
+    }
+
+    // --- Color del usuario (global a todas sus conversaciones) ---
+    if (url.pathname === "/api/color" && request.method === "POST") {
+      if (!user) return json({ error: "unauthorized" }, { status: 401 });
+      const { color } = (await request.json()) as { color?: unknown };
+      const clean = cleanColor(color);
+      if (!clean) return json({ error: "bad color" }, { status: 400 });
+      await env.USERS.get(env.USERS.idFromName(user)).setColor(clean);
+      return json({ color: clean });
     }
 
     // --- Lista de chats / abrir chat ---

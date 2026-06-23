@@ -27,7 +27,26 @@ export class UserDO extends DurableObject<Env> {
           createdAt      INTEGER NOT NULL
         );
       `);
+      // Pares clave/valor del perfil del usuario (de momento: su color).
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+      `);
     });
+  }
+
+  // Color elegido por el usuario (global a todas sus conversaciones), o null.
+  getColor(): string | null {
+    const rows = this.ctx.storage.sql
+      .exec<{ v: string }>("SELECT v FROM meta WHERE k = 'color'")
+      .toArray();
+    return rows.length ? rows[0].v : null;
+  }
+
+  setColor(color: string): void {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO meta (k, v) VALUES ('color', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+      color,
+    );
   }
 
   // Idempotente: abrir el mismo chat dos veces no lo duplica.

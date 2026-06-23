@@ -154,25 +154,14 @@ button:hover { background: var(--accent-dim); }
   position: relative;
 }
 .bubble .text { white-space: pre-wrap; }
-.bubble .time { display: block; margin-top: .15rem; font-size: .65rem; color: var(--muted); }
+/* la hora hereda el color del texto de la burbuja, atenuada */
+.bubble .time { display: block; margin-top: .15rem; font-size: .65rem; opacity: .6; }
 
-/* las mías: a la derecha, doradas, texto oscuro */
-.bubble.mine {
-  align-self: flex-end;
-  background: var(--accent);
-  color: var(--bg);
-  border-bottom-right-radius: 4px;
-}
-.bubble.mine .time { color: rgba(13, 12, 10, .55); text-align: right; }
-
-/* las del otro: a la izquierda, superficie */
-.bubble.theirs {
-  align-self: flex-start;
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: 4px;
-}
+/* el fondo + color de texto de cada burbuja lo pone render.js con el color del
+   autor; aquí solo la posición y la esquina "pico" de cada lado */
+.bubble.mine { align-self: flex-end; border-bottom-right-radius: 4px; }
+.bubble.mine .time { text-align: right; }
+.bubble.theirs { align-self: flex-start; border-bottom-left-radius: 4px; }
 
 #composer {
   display: flex;
@@ -182,3 +171,19 @@ button:hover { background: var(--accent-dim); }
   background: var(--bg);
 }
 #composer input { flex: 1; }
+
+/* selector de color propio: un cuadradito a la derecha de la cabecera */
+.swatch {
+  margin-left: auto;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+.swatch::-webkit-color-swatch { border: none; border-radius: 2px; }
+.swatch::-moz-color-swatch { border: none; border-radius: 2px; }
