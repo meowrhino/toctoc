@@ -1,0 +1,184 @@
+/* toctoc — messenger 1:1 con burbujas estilo Messenger, sobre la paleta de
+   twoitter (negro cálido + dorado + JetBrains Mono + textura de puntos). */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0d0c0a;
+  --surface: #16130f;
+  --surface-2: #1d1914;
+  --border: #2a2622;
+  --hairline: #221e1a;
+  --text: #d8d2c4;
+  --text-dim: #a89e8b;
+  --muted: #6b6357;
+  --accent: #e8b04a;
+  --accent-dim: #b58836;
+  --dots: #1a1612;
+  --mono: 'JetBrains Mono', 'Menlo', monospace;
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+
+/* textura de fondo (viñeta + puntitos) anclada al viewport, como en twoitter */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 60% 55% at 50% 40%, var(--bg) 0%, var(--bg) 30%, transparent 78%),
+    radial-gradient(var(--dots) 1px, transparent 1px);
+  background-size: auto, 22px 22px;
+}
+
+.hidden { display: none !important; }
+
+/* barra superior */
+.topbar {
+  display: flex;
+  gap: .9rem;
+  align-items: baseline;
+  padding: .55rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(var(--surface), var(--bg));
+}
+.topbar h1 { margin: 0; font-size: .95rem; font-weight: 600; color: var(--accent); }
+.topbar .meta { font-size: .75rem; color: var(--muted); }
+
+/* campos e inputs comunes */
+input, button { font: inherit; }
+input {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .45rem .6rem;
+}
+input::placeholder { color: var(--muted); }
+input:focus { outline: none; border-color: var(--accent); }
+button {
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius);
+  padding: .45rem 1rem;
+  cursor: pointer;
+}
+button:hover { background: var(--accent-dim); }
+
+/* login */
+.login { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.login .card {
+  display: flex;
+  flex-direction: column;
+  gap: .7rem;
+  width: min(320px, 90vw);
+  padding: 1.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, .5);
+}
+.login h2 { margin: 0; color: var(--accent); font-size: 1.1rem; }
+.login .meta { margin: 0; color: var(--muted); font-size: .8rem; }
+
+/* app: barra lateral + conversación */
+.app { flex: 1; display: flex; overflow: hidden; }
+
+#sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+#newchat { display: flex; gap: .4rem; padding: .6rem; border-bottom: 1px solid var(--border); }
+#newchat input { flex: 1; min-width: 0; }
+#newchat button { padding: .45rem .7rem; }
+
+#chatlist { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+#chatlist li {
+  padding: .6rem .9rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 3px solid transparent; /* se colorea con el acento del contacto */
+  color: var(--text-dim);
+}
+#chatlist li:hover { background: var(--surface-2); color: var(--text); }
+#chatlist li.active { background: var(--surface-2); color: var(--accent); }
+
+#conv { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#empty { margin: auto; color: var(--muted); }
+#convhead {
+  padding: .55rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* mensajes: burbujas estilo Messenger */
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.bubble {
+  max-width: 72%;
+  padding: .4rem .65rem;
+  border-radius: 14px;
+  word-break: break-word;
+  position: relative;
+}
+.bubble .text { white-space: pre-wrap; }
+.bubble .time { display: block; margin-top: .15rem; font-size: .65rem; color: var(--muted); }
+
+/* las mías: a la derecha, doradas, texto oscuro */
+.bubble.mine {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--bg);
+  border-bottom-right-radius: 4px;
+}
+.bubble.mine .time { color: rgba(13, 12, 10, .55); text-align: right; }
+
+/* las del otro: a la izquierda, superficie */
+.bubble.theirs {
+  align-self: flex-start;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+#composer {
+  display: flex;
+  gap: .5rem;
+  padding: .6rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+#composer input { flex: 1; }

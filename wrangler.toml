@@ -2,6 +2,15 @@ name = "toctoc"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
 
+# Mantener también la URL *.workers.dev como respaldo estable.
+workers_dev = true
+
+# Dominio bonito. Requiere que meowrhino.studio sea una zona de esta cuenta de
+# Cloudflare; Wrangler crea el registro DNS + el certificado automáticamente.
+routes = [
+  { pattern = "toctoc.meowrhino.studio", custom_domain = true },
+]
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
