@@ -129,11 +129,27 @@ button:hover { background: var(--accent-dim); }
 #conv { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 #empty { margin: auto; color: var(--muted); }
 #convhead {
-  padding: .55rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .45rem 1rem;
   border-bottom: 1px solid var(--border);
   color: var(--text-dim);
   font-weight: 600;
 }
+.delchat {
+  font: inherit;
+  font-weight: 500;
+  font-size: .75rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .2rem .5rem;
+  cursor: pointer;
+}
+.delchat:hover { color: #e87a7a; border-color: #e87a7a; background: none; }
 
 /* mensajes: burbujas estilo Messenger */
 #messages {

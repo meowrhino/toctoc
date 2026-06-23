@@ -5,7 +5,7 @@
 //   msg     → un mensaje
 //   color   → { name, color }          (alguien cambió su color)
 
-export function connectConversation({ conversationId, onHistory, onMessage, onColor }) {
+export function connectConversation({ conversationId, onHistory, onMessage, onColor, onCleared }) {
   let ws;
   let closed = false;
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -18,6 +18,7 @@ export function connectConversation({ conversationId, onHistory, onMessage, onCo
       if (data.type === "history") onHistory(data.messages, data.profiles || {});
       else if (data.type === "msg") onMessage(data);
       else if (data.type === "color") onColor(data);
+      else if (data.type === "cleared") onCleared?.();
     };
     ws.onclose = () => {
       if (!closed) setTimeout(open, 1000);

@@ -27,6 +27,7 @@ async function reload() {
 
 export async function init() {
   conversation.wireComposer();
+  conversation.onAfterDelete(reload); // al borrar una conversación, refresca la lista
   await reload();
 
   // "toc": abre (o recupera) el 1:1 con alguien y salta a él.

@@ -102,6 +102,22 @@ export default {
       return json({ conversationId: conv, other });
     }
 
+    // Borrar una conversación (para los dos): vacía el DO y la quita de ambas
+    // bandejas. Solo un miembro del 1:1 puede borrarla.
+    if (url.pathname === "/api/chats/delete" && request.method === "POST") {
+      if (!user) return json({ error: "unauthorized" }, { status: 401 });
+      const { conversationId } = (await request.json()) as { conversationId?: string };
+      const conv = String(conversationId || "");
+      const members = conv.split("~");
+      if (members.length !== 2 || !members.includes(user)) {
+        return json({ error: "forbidden" }, { status: 403 });
+      }
+      await env.CHAT.get(env.CHAT.idFromName(conv)).clear();
+      await env.USERS.get(env.USERS.idFromName(members[0])).removeChat(conv);
+      await env.USERS.get(env.USERS.idFromName(members[1])).removeChat(conv);
+      return json({ ok: true });
+    }
+
     // --- Estático ---
     return env.ASSETS.fetch(request);
   },

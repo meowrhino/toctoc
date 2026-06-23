@@ -38,4 +38,12 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ color }),
     }).then(jsonOrThrow),
+
+  // Borra una conversación entera (para los dos) → { ok: true }
+  deleteChat: (conversationId) =>
+    fetch("/api/chats/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId }),
+    }).then(jsonOrThrow),
 };

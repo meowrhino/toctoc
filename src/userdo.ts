@@ -66,4 +66,9 @@ export class UserDO extends DurableObject<Env> {
       )
       .toArray();
   }
+
+  // Quita un chat de la bandeja de este usuario (al borrar la conversación).
+  removeChat(conversationId: string): void {
+    this.ctx.storage.sql.exec("DELETE FROM chats WHERE conversationId = ?", conversationId);
+  }
 }

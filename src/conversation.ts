@@ -143,6 +143,15 @@ export class ConversationDO extends DurableObject<Env> {
     }
   }
 
+  // Borra la conversación entera (mensajes + colores) y avisa a los conectados
+  // para que vacíen su vista. Lo llama el Worker por RPC tras comprobar que
+  // quien borra es miembro del 1:1.
+  clear(): void {
+    this.ctx.storage.sql.exec("DELETE FROM messages");
+    this.ctx.storage.sql.exec("DELETE FROM profiles");
+    this.broadcast(JSON.stringify({ type: "cleared" }));
+  }
+
   private broadcast(blob: string): void {
     for (const peer of this.ctx.getWebSockets()) {
       try {
