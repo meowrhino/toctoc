@@ -5,7 +5,7 @@
 //   msg     → un mensaje
 //   color   → { name, color }          (alguien cambió su color)
 
-export function connectConversation({ conversationId, onHistory, onMessage, onColor, onCleared }) {
+export function connectConversation({ conversationId, onHistory, onMessage, onColor, onCleared, onPresence }) {
   let ws;
   let closed = false;
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -15,10 +15,11 @@ export function connectConversation({ conversationId, onHistory, onMessage, onCo
     ws = new WebSocket(url);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
-      if (data.type === "history") onHistory(data.messages, data.profiles || {});
+      if (data.type === "history") onHistory(data.messages, data.profiles || {}, data.online || []);
       else if (data.type === "msg") onMessage(data);
       else if (data.type === "color") onColor(data);
       else if (data.type === "cleared") onCleared?.();
+      else if (data.type === "presence") onPresence?.(data.online || []);
     };
     ws.onclose = () => {
       if (!closed) setTimeout(open, 1000);

@@ -9,6 +9,7 @@ import { addMessage, renderHistory, applyColor } from "./render.js";
 
 let conn = null;
 let current = null; // entry abierto { conversationId, other }
+let currentOnline = []; // nombres conectados ahora en esta conversación
 let afterDelete = () => {}; // lo fija chats.js para refrescar la barra lateral
 
 export function onAfterDelete(fn) {
@@ -28,7 +29,10 @@ export function open(entry) {
 
   conn = connectConversation({
     conversationId: entry.conversationId,
-    onHistory: (msgs, profiles) => renderHistory(msgs, me, profiles),
+    onHistory: (msgs, profiles, online) => {
+      renderHistory(msgs, me, profiles);
+      updatePresence(online);
+    },
     onMessage: (m) => addMessage(m, me),
     onColor: ({ name, color }) => applyColor(name, color),
     onCleared: () => {
@@ -36,24 +40,43 @@ export function open(entry) {
       closePanel();
       afterDelete();
     },
+    onPresence: updatePresence,
   });
 }
 
-// Cabecera: nombre del otro + botón de borrar.
+// Cabecera: puntito de presencia del otro + su nombre, y botón de borrar.
 function buildHead(entry) {
   const head = $("#convhead");
   head.innerHTML = "";
+  const left = document.createElement("span");
+  left.className = "convleft";
+  const dot = document.createElement("span");
+  dot.className = "convdot off";
+  dot.id = "otherdot";
   const name = document.createElement("span");
   name.className = "convname";
   name.textContent = entry.other;
+  left.append(dot, name);
   const del = document.createElement("button");
   del.type = "button";
   del.className = "delchat";
   del.title = "borrar conversación";
   del.textContent = "borrar";
   del.addEventListener("click", deleteCurrent);
-  head.append(name, del);
+  head.append(left, del);
   head.classList.remove("hidden");
+  updatePresence(currentOnline);
+}
+
+// Refleja si el otro está en línea (puntito verde) o desconectado (gris).
+function updatePresence(online) {
+  currentOnline = online || [];
+  const dot = $("#otherdot");
+  if (!dot || !current) return;
+  const on = currentOnline.includes(current.other);
+  dot.classList.toggle("on", on);
+  dot.classList.toggle("off", !on);
+  dot.title = on ? "en línea" : "desconectado";
 }
 
 async function deleteCurrent() {

@@ -3,13 +3,13 @@ import type { Env } from "./index";
 import { cleanColor } from "./color";
 
 // Un mensaje tal y como viaja al cliente y como se guarda en SQLite.
-// `type` (no `interface`) para que tenga índice de string implícito y
-// satisfaga el genérico de sql.exec<T> (Record<string, SqlStorageValue>).
+// `kind`: 'user' (lo escribe alguien) | 'system' (la sala: conexiones/salidas).
 export type ChatMessage = {
   seq: number;
   author: string;
   body: string;
   ts: number;
+  kind: string;
 };
 
 // Estado que sobrevive a la hibernación, atado a cada conexión (máx 16 KB).
@@ -18,11 +18,17 @@ interface Attachment {
   color: string;
 }
 
+// "se ha conectado" como mucho una vez por persona cada ventana (evita spam de
+// refresco/reconexión). "se ha desconectado" con gracia (absorbe caídas breves
+// de red: el cliente reconecta solo en ~1s).
+const JOIN_WINDOW_MS = 5 * 60 * 1000;
+const LEAVE_GRACE_MS = 12 * 1000;
+
 /**
- * ConversationDO — EL MOTOR. Una instancia por conversación (en toctoc, un 1:1
- * entre dos usuarios). Sabe de mensajes, orden, color de cada participante y
- * fan-out en tiempo real. La identidad/membresía se resuelve fuera (Worker +
- * UserDO); aquí el `author` y el `color` ya llegan validados por el Worker.
+ * ConversationDO — EL MOTOR (1:1 en toctoc). Sabe de mensajes, orden, color de
+ * cada participante, presencia (quién está conectado) y fan-out en tiempo real.
+ * La identidad/membresía se resuelve fuera (Worker + UserDO); aquí el `author` y
+ * el `color` ya llegan validados/autenticados por el Worker.
  *
  * Realtime vía WebSocket Hibernation API (`acceptWebSocket`, no `ws.accept()`).
  */
@@ -36,15 +42,34 @@ export class ConversationDO extends DurableObject<Env> {
           seq    INTEGER PRIMARY KEY AUTOINCREMENT,
           author TEXT    NOT NULL,
           body   TEXT    NOT NULL,
-          ts     INTEGER NOT NULL
+          ts     INTEGER NOT NULL,
+          kind   TEXT    NOT NULL DEFAULT 'user'
         );
       `);
-      // Color de cada participante, para teñir sus burbujas (también el
-      // historial) y mantenerlo en sync entre los dos.
+      // Migración para conversaciones creadas sin la columna `kind`.
+      try {
+        sql.exec("ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'user'");
+      } catch {
+        // ya existe
+      }
       sql.exec(`
         CREATE TABLE IF NOT EXISTS profiles (
-          name  TEXT PRIMARY KEY,
-          color TEXT NOT NULL
+          name       TEXT    PRIMARY KEY,
+          color      TEXT    NOT NULL,
+          lastJoinTs INTEGER NOT NULL DEFAULT 0
+        );
+      `);
+      // Migración para profiles creado sin `lastJoinTs`.
+      try {
+        sql.exec("ALTER TABLE profiles ADD COLUMN lastJoinTs INTEGER NOT NULL DEFAULT 0");
+      } catch {
+        // ya existe
+      }
+      // Salidas pendientes de anunciar (con gracia): name → cuándo toca avisar.
+      sql.exec(`
+        CREATE TABLE IF NOT EXISTS pending_leave (
+          name    TEXT    PRIMARY KEY,
+          leaveAt INTEGER NOT NULL
         );
       `);
     });
@@ -56,32 +81,33 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     const url = new URL(request.url);
-    // El Worker ya puso aquí el nombre AUTENTICADO y el color del usuario (desde
-    // su UserDO), no lo que diga el cliente.
+    // El Worker ya puso aquí el nombre AUTENTICADO y el color del usuario.
     const name = (url.searchParams.get("name") || "anon").slice(0, 25) || "anon";
     const color = cleanColor(url.searchParams.get("color")) ?? "#a89e8b";
 
-    // El color que inyecta el Worker es autoritativo (viene del UserDO), así que
-    // SÍ lo refrescamos en cada conexión: mantiene la conversación al día si el
-    // usuario cambió su color desde otra conversación/dispositivo.
-    this.ctx.storage.sql.exec(
-      `INSERT INTO profiles (name, color) VALUES (?, ?)
-       ON CONFLICT(name) DO UPDATE SET color = excluded.color`,
-      name,
-      color,
-    );
+    // El color del Worker es autoritativo (viene del UserDO) → lo refrescamos
+    // siempre; `lastJoinTs` solo avanza cuando anunciamos la conexión.
+    const announce = this.touchProfile(name, color);
+    // Si vuelve antes de expirar la gracia, cancela su "se ha desconectado".
+    this.ctx.storage.sql.exec("DELETE FROM pending_leave WHERE name = ?", name);
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ name, color } satisfies Attachment);
 
     server.send(
-      JSON.stringify({ type: "history", messages: this.recent(50), profiles: this.profiles() }),
+      JSON.stringify({
+        type: "history",
+        messages: this.recent(50),
+        profiles: this.profiles(),
+        online: this.onlineNames(),
+      }),
     );
 
-    // Avisa a quien ya esté en la conversación de nuestro color, para que nos
-    // pinte bien al instante (sin esperar a que mandemos algo o reconecte).
+    if (announce) this.system(name, "se ha conectado");
+    // Avisa del color del que entra para que el otro lo pinte al instante.
     this.broadcast(JSON.stringify({ type: "color", name, color }));
+    this.broadcastPresence();
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -98,17 +124,16 @@ export class ConversationDO extends DurableObject<Env> {
     const att = ws.deserializeAttachment() as Attachment | null;
     const author = att?.name ?? "anon";
 
-    // Cambio de color en vivo: actualiza el perfil y lo difunde para que el otro
-    // recoloree las burbujas de esta persona (incluido el historial).
+    // Cambio de color en vivo: persiste y difunde (con dedupe del no-op).
     if (data.type === "color") {
       const color = cleanColor(data.color);
       if (!color) return;
       const cur = this.ctx.storage.sql
         .exec<{ color: string }>("SELECT color FROM profiles WHERE name = ?", author)
         .toArray();
-      if (cur.length && cur[0].color === color) return; // no-op
+      if (cur.length && cur[0].color === color) return;
       this.ctx.storage.sql.exec(
-        `INSERT INTO profiles (name, color) VALUES (?, ?)
+        `INSERT INTO profiles (name, color, lastJoinTs) VALUES (?, ?, 0)
          ON CONFLICT(name) DO UPDATE SET color = excluded.color`,
         author,
         color,
@@ -121,18 +146,7 @@ export class ConversationDO extends DurableObject<Env> {
     if (data.type !== "msg" || typeof data.body !== "string") return;
     const body = data.body.trim().slice(0, 1000);
     if (!body) return;
-    const ts = Date.now();
-
-    const row = this.ctx.storage.sql
-      .exec<{ seq: number }>(
-        "INSERT INTO messages (author, body, ts) VALUES (?, ?, ?) RETURNING seq",
-        author,
-        body,
-        ts,
-      )
-      .one();
-
-    this.broadcast(JSON.stringify({ type: "msg", seq: row.seq, author, body, ts }));
+    this.append(author, body, "user");
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
@@ -141,15 +155,85 @@ export class ConversationDO extends DurableObject<Env> {
     } catch {
       // ya cerrado
     }
+    const att = ws.deserializeAttachment() as Attachment | null;
+    const name = att?.name;
+    if (name && !this.hasOtherSocket(ws, name)) {
+      const leaveAt = Date.now() + LEAVE_GRACE_MS;
+      this.ctx.storage.sql.exec(
+        "INSERT INTO pending_leave (name, leaveAt) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET leaveAt = excluded.leaveAt",
+        name,
+        leaveAt,
+      );
+      await this.scheduleAlarm(leaveAt);
+    }
+    this.broadcastPresence(ws);
+  }
+
+  // Vence la gracia: anuncia a quien siga sin conexión y reprograma si quedan.
+  async alarm(): Promise<void> {
+    const now = Date.now();
+    const due = this.ctx.storage.sql
+      .exec<{ name: string }>("SELECT name FROM pending_leave WHERE leaveAt <= ?", now)
+      .toArray();
+    for (const { name } of due) {
+      this.ctx.storage.sql.exec("DELETE FROM pending_leave WHERE name = ?", name);
+      if (!this.onlineNames().includes(name)) this.system(name, "se ha desconectado");
+    }
+    const next = this.ctx.storage.sql
+      .exec<{ m: number | null }>("SELECT MIN(leaveAt) AS m FROM pending_leave")
+      .toArray();
+    if (next[0]?.m) await this.ctx.storage.setAlarm(next[0].m);
   }
 
   // Borra la conversación entera (mensajes + colores) y avisa a los conectados
-  // para que vacíen su vista. Lo llama el Worker por RPC tras comprobar que
-  // quien borra es miembro del 1:1.
+  // para que vacíen su vista. Lo llama el Worker por RPC tras comprobar
+  // membresía del 1:1.
   clear(): void {
     this.ctx.storage.sql.exec("DELETE FROM messages");
     this.ctx.storage.sql.exec("DELETE FROM profiles");
+    this.ctx.storage.sql.exec("DELETE FROM pending_leave");
     this.broadcast(JSON.stringify({ type: "cleared" }));
+  }
+
+  // --- helpers -------------------------------------------------------------
+
+  // Registra la conexión y decide si anunciarla (fuera de la ventana). El color
+  // SÍ se refresca siempre (lo manda autenticado el Worker desde el UserDO).
+  private touchProfile(name: string, color: string): boolean {
+    const now = Date.now();
+    const prev = this.ctx.storage.sql
+      .exec<{ lastJoinTs: number }>("SELECT lastJoinTs FROM profiles WHERE name = ?", name)
+      .toArray();
+    const announce = prev.length === 0 || now - prev[0].lastJoinTs > JOIN_WINDOW_MS;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO profiles (name, color, lastJoinTs) VALUES (?, ?, ?)
+       ON CONFLICT(name) DO UPDATE SET
+         color = excluded.color,
+         lastJoinTs = CASE WHEN ? = 1 THEN excluded.lastJoinTs ELSE profiles.lastJoinTs END`,
+      name,
+      color,
+      announce ? now : 0,
+      announce ? 1 : 0,
+    );
+    return announce;
+  }
+
+  private append(author: string, body: string, kind: "user" | "system"): void {
+    const ts = Date.now();
+    const row = this.ctx.storage.sql
+      .exec<{ seq: number }>(
+        "INSERT INTO messages (author, body, ts, kind) VALUES (?, ?, ?, ?) RETURNING seq",
+        author,
+        body,
+        ts,
+        kind,
+      )
+      .one();
+    this.broadcast(JSON.stringify({ type: "msg", seq: row.seq, author, body, ts, kind }));
+  }
+
+  private system(author: string, body: string): void {
+    this.append(author, body, "system");
   }
 
   private broadcast(blob: string): void {
@@ -160,6 +244,34 @@ export class ConversationDO extends DurableObject<Env> {
         // peer muerto; el cierre lo limpia
       }
     }
+  }
+
+  private broadcastPresence(exclude?: WebSocket): void {
+    this.broadcast(JSON.stringify({ type: "presence", online: this.onlineNames(exclude) }));
+  }
+
+  private onlineNames(exclude?: WebSocket): string[] {
+    const set = new Set<string>();
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === exclude) continue;
+      const att = ws.deserializeAttachment() as Attachment | null;
+      if (att?.name) set.add(att.name);
+    }
+    return [...set];
+  }
+
+  private hasOtherSocket(self: WebSocket, name: string): boolean {
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === self) continue;
+      const att = ws.deserializeAttachment() as Attachment | null;
+      if (att?.name === name) return true;
+    }
+    return false;
+  }
+
+  private async scheduleAlarm(t: number): Promise<void> {
+    const cur = await this.ctx.storage.getAlarm();
+    if (cur === null || t < cur) await this.ctx.storage.setAlarm(t);
   }
 
   // Mapa nombre → color para el snapshot inicial.
@@ -176,7 +288,7 @@ export class ConversationDO extends DurableObject<Env> {
   private recent(limit: number): ChatMessage[] {
     return this.ctx.storage.sql
       .exec<ChatMessage>(
-        "SELECT seq, author, body, ts FROM messages ORDER BY seq DESC LIMIT ?",
+        "SELECT seq, author, body, ts, kind FROM messages ORDER BY seq DESC LIMIT ?",
         limit,
       )
       .toArray()

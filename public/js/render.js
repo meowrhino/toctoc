@@ -21,6 +21,16 @@ export function addMessage(m, me) {
   // ¿estaba pegado al fondo? si subió a leer, no lo arrancamos abajo
   const wasAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
 
+  // Avisos de la sala (conexión/desconexión): línea centrada, no burbuja.
+  if (m.kind === "system") {
+    const sys = document.createElement("li");
+    sys.className = "sysline";
+    sys.textContent = `${m.author} ${m.body}`;
+    box.appendChild(sys);
+    if (wasAtBottom) box.scrollTop = box.scrollHeight;
+    return;
+  }
+
   const li = document.createElement("li");
   li.className = "bubble " + (m.author === me ? "mine" : "theirs");
   li.dataset.author = m.author;

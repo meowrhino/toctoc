@@ -151,6 +151,21 @@ button:hover { background: var(--accent-dim); }
 }
 .delchat:hover { color: #e87a7a; border-color: #e87a7a; background: none; }
 
+/* presencia del otro en la cabecera: verde = en línea, gris = desconectado */
+.convleft { display: inline-flex; align-items: center; gap: .5rem; min-width: 0; }
+.convdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.convdot.on { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+.convdot.off { background: var(--muted); }
+
+/* aviso de la sala (conexión/desconexión): línea centrada y tenue */
+.sysline {
+  align-self: center;
+  margin: .15rem 0;
+  font-size: .72rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
 /* mensajes: burbujas estilo Messenger */
 #messages {
   flex: 1;
