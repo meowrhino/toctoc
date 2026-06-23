@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./index";
-import { cleanColor } from "./color";
+import { cleanColor, defaultColor } from "./color";
 
 // Un mensaje tal y como viaja al cliente y como se guarda en SQLite.
 // `kind`: 'user' (lo escribe alguien) | 'system' (la sala: conexiones/salidas).
@@ -96,7 +96,7 @@ export class ConversationDO extends DurableObject<Env> {
     const url = new URL(request.url);
     // El Worker ya puso aquí el nombre AUTENTICADO y el color del usuario.
     const name = (url.searchParams.get("name") || "anon").slice(0, 25) || "anon";
-    const color = cleanColor(url.searchParams.get("color")) ?? "#a89e8b";
+    const color = cleanColor(url.searchParams.get("color")) ?? defaultColor(name);
     const ip = request.headers.get("CF-Connecting-IP") || "local";
 
     // El color del Worker es autoritativo (viene del UserDO) → lo refrescamos

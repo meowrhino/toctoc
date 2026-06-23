@@ -60,6 +60,9 @@ export async function getUser(request: Request, secret: string | undefined): Pro
   const name = raw.slice(0, dot);
   const sig = raw.slice(dot + 1);
   if (!name) return null;
+  // "~" es el separador del conversationId; un nombre con "~" (de una cookie
+  // emitida antes del filtro de /api/login) daría ids ambiguos → no autenticar.
+  if (name.includes("~")) return null;
 
   const expected = await sign(name, secret);
   if (!safeEqual(sig, expected)) return null;
