@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>toctoc</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚪</text></svg>" />
+  <style>
+    :root {
+      --bg: #1e1e1e; --fg: #d4d4d4; --muted: #808080;
+      --accent: #c586c0; --line: #333; --panel: #252526;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; height: 100vh;
+      font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--bg); color: var(--fg);
+      display: flex; flex-direction: column;
+    }
+    header {
+      padding: .6rem 1rem; border-bottom: 1px solid var(--line);
+      display: flex; gap: 1rem; align-items: baseline;
+    }
+    header h1 { margin: 0; font-size: 1rem; color: var(--accent); }
+    header .meta { color: var(--muted); font-size: .8rem; }
+    .hidden { display: none !important; }
+    main { flex: 1; display: flex; overflow: hidden; }
+    input, button { font: inherit; }
+    input {
+      background: #2a2a2a; border: 1px solid var(--line); color: var(--fg);
+      padding: .5rem; border-radius: 4px;
+    }
+    button {
+      background: var(--accent); color: #fff; border: 0; padding: .5rem 1rem;
+      border-radius: 4px; cursor: pointer;
+    }
+
+    /* login */
+    #login { margin: auto; display: flex; flex-direction: column; gap: .75rem; width: min(320px, 80vw); }
+    #login h2 { color: var(--accent); margin: 0 0 .25rem; }
+
+    /* app */
+    #sidebar {
+      width: 240px; border-right: 1px solid var(--line); background: var(--panel);
+      display: flex; flex-direction: column;
+    }
+    #newchat { display: flex; gap: .4rem; padding: .6rem; border-bottom: 1px solid var(--line); }
+    #newchat input { flex: 1; min-width: 0; }
+    #chatlist { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+    #chatlist li {
+      padding: .6rem 1rem; cursor: pointer; border-bottom: 1px solid var(--line);
+    }
+    #chatlist li:hover, #chatlist li.active { background: #2d2d2d; color: var(--accent); }
+    #conv { flex: 1; display: flex; flex-direction: column; }
+    #convhead { padding: .6rem 1rem; border-bottom: 1px solid var(--line); color: var(--muted); }
+    #messages { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 1rem; }
+    #messages li { margin: 0 0 .35rem; word-break: break-word; }
+    #messages b { color: var(--accent); margin-right: .4rem; }
+    #composer { display: flex; gap: .5rem; padding: .75rem 1rem; border-top: 1px solid var(--line); }
+    #composer input { flex: 1; }
+    #empty { margin: auto; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>toctoc</h1>
+    <span class="meta" id="whoami"></span>
+  </header>
+
+  <!-- pantalla de login -->
+  <main id="login">
+    <h2>toctoc</h2>
+    <p class="meta">¿quién eres? (sin contraseña por ahora)</p>
+    <input id="loginName" type="text" placeholder="tu nombre" maxlength="25" />
+    <button id="loginBtn">entrar</button>
+  </main>
+
+  <!-- app -->
+  <main id="app" class="hidden">
+    <aside id="sidebar">
+      <form id="newchat" autocomplete="off">
+        <input id="newchatName" type="text" placeholder="hablar con…" maxlength="25" />
+        <button type="submit">toc</button>
+      </form>
+      <ul id="chatlist"></ul>
+    </aside>
+    <section id="conv">
+      <div id="empty">elige un chat o empieza uno nuevo</div>
+      <div id="convhead" class="hidden"></div>
+      <ul id="messages" class="hidden"></ul>
+      <form id="composer" class="hidden" autocomplete="off">
+        <input id="body" type="text" placeholder="escribe…" maxlength="1000" />
+        <button type="submit">enviar</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
