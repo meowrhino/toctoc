@@ -37,6 +37,28 @@ export function textOn(color) {
   return lum > 150 ? "#0d0c0a" : "#f5f0e6";
 }
 
+// Mete `text` en `el` convirtiendo las URLs http(s) en enlaces clicables. Usa
+// solo nodos de texto + <a> (nunca innerHTML) y la regex solo casa http(s):// →
+// el href nunca puede ser javascript: ni nada inyectable.
+const URL_RE = /(https?:\/\/[^\s<]+)/g;
+export function linkifyInto(el, text) {
+  let last = 0;
+  let m;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text))) {
+    if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const a = document.createElement("a");
+    a.href = m[0];
+    a.textContent = m[0];
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.className = "link";
+    el.appendChild(a);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+}
+
 // Hora corta HH:MM a partir de un timestamp en ms.
 export function hhmm(ts) {
   const d = new Date(ts);

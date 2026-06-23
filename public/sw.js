@@ -4,7 +4,7 @@
 //
 // Estrategia: stale-while-revalidate del shell. Sube la versión del CACHE al
 // cambiar el shell.
-const CACHE = "toctoc-v1";
+const CACHE = "toctoc-v2";
 const SHELL = [
   "/",
   "/style.css",
@@ -16,6 +16,7 @@ const SHELL = [
   "/js/render.js",
   "/js/conversation.js",
   "/js/chats.js",
+  "/js/alerts.js",
   "/manifest.webmanifest",
   "/icon.svg",
   "/icon-192.png",

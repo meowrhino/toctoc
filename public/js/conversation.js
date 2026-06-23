@@ -6,6 +6,7 @@ import { getMe } from "./session.js";
 import { api } from "./api.js";
 import { connectConversation } from "./ws.js";
 import { addMessage, renderHistory, applyColor } from "./render.js";
+import * as alerts from "./alerts.js";
 
 let conn = null;
 let current = null; // entry abierto { conversationId, other }
@@ -33,7 +34,11 @@ export function open(entry) {
       renderHistory(msgs, me, profiles);
       updatePresence(online);
     },
-    onMessage: (m) => addMessage(m, me),
+    onMessage: (m) => {
+      addMessage(m, me);
+      // sonido/badge/notificación solo si el mensaje es del otro
+      if (m.kind !== "system" && m.author !== me) alerts.incoming(m.author, m.body);
+    },
     onColor: ({ name, color }) => applyColor(name, color),
     onCleared: () => {
       // El otro borró la conversación → la quitamos también de nuestra vista.
@@ -111,6 +116,7 @@ export function wireComposer() {
     const input = $("#body");
     const body = input.value.trim();
     if (!body || !conn) return;
+    alerts.askNotifPermission(); // gesto del usuario → buen momento para pedir permiso
     conn.send(body);
     input.value = "";
   });

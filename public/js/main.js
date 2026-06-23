@@ -7,8 +7,11 @@ import { setMe, getMe, setMyColor, showLogin, showApp } from "./session.js";
 import { applyColor } from "./render.js";
 import * as chats from "./chats.js";
 import * as conversation from "./conversation.js";
+import * as alerts from "./alerts.js";
 
 const picker = $("#mycolor");
+
+alerts.setup({ emoji: "🚪", base: "toctoc" });
 
 async function enter(name, color) {
   setMe(name);

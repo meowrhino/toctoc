@@ -2,7 +2,7 @@
 // del otro a la izquierda. Cada burbuja se tiñe con el color de su autor (el
 // elegido, o el determinista por defecto), con texto legible automático.
 // Siempre con textContent (nunca innerHTML) → el texto del usuario va escapado.
-import { $, colorFor, textOn, hhmm } from "./util.js";
+import { $, colorFor, textOn, hhmm, linkifyInto } from "./util.js";
 
 const list = () => $("#messages");
 
@@ -38,7 +38,7 @@ export function addMessage(m, me) {
 
   const text = document.createElement("div");
   text.className = "text";
-  text.textContent = m.body;
+  linkifyInto(text, m.body);
 
   const time = document.createElement("span");
   time.className = "time";
